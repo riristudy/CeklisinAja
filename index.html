@@ -382,7 +382,7 @@
       const kataKerja = idEdit ? 'diperbarui' : 'ditambahkan';
       dlg.close();
       await muat();
-      tampilPesan('Kegiatan "' + nama + '" ' + kataKerja + '.');
+            tampilPesan(hasil.peringatan ? hasil.peringatan : 'Kegiatan "' + nama + '" ' + kataKerja + '.', !!hasil.peringatan);
     } catch (e) {
       galatForm.textContent = 'Gagal menyimpan: ' + e.message;
     }
