@@ -6,9 +6,9 @@
 <meta name="color-scheme" content="light dark">
 <title>Daily Check</title>
 <style>
-  :root { --bg:#fafaf7; --fg:#1f2933; --card:#ffffff; --ac:#2f6f5e; --bd:#dde3df; --mute:#6b7a73; }
+  :root { --bg:#fafaf7; --fg:#1f2933; --card:#ffffff; --ac:#2f6f5e; --bd:#dde3df; --mute:#6b7a73; --bahaya:#c0392b; }
   @media (prefers-color-scheme: dark) {
-    :root { --bg:#161a18; --fg:#e8ece9; --card:#1f2623; --ac:#7cc4ae; --bd:#34413b; --mute:#9aaaa2; }
+    :root { --bg:#161a18; --fg:#e8ece9; --card:#1f2623; --ac:#7cc4ae; --bd:#34413b; --mute:#9aaaa2; --bahaya:#e06c5f; }
   }
   * { box-sizing: border-box; }
   [hidden] { display:none !important; }
@@ -16,21 +16,30 @@
          font:17px/1.5 system-ui, sans-serif; max-width:560px; margin-inline:auto; }
   .atas { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; }
   h1 { margin:0; font-size:1.6rem; color:var(--ac); }
-  #tanggal { margin:2px 0 16px; color:var(--mute); }
+  #tanggal { margin:2px 0 14px; color:var(--mute); }
+  .tab { display:flex; gap:8px; margin:0 0 14px; }
+  .tab button { flex:1; padding:9px; font:inherit; color:var(--fg); background:transparent;
+                border:1px solid var(--bd); border-radius:10px; cursor:pointer; }
+  .tab button.aktif { background:var(--ac); color:var(--bg); border-color:var(--ac); font-weight:600; }
   ul { list-style:none; margin:0; padding:0; }
-  li { margin:8px 0; }
-  #daftar label { display:flex; align-items:center; gap:14px; padding:14px;
-          background:var(--card); border:1px solid var(--bd); border-radius:12px; }
+  li { margin:8px 0; display:flex; gap:8px; align-items:stretch; }
+  .baris { flex:1; display:flex; align-items:center; gap:14px; padding:14px;
+           background:var(--card); border:1px solid var(--bd); border-radius:12px; }
   input[type=checkbox], input[type=radio] { width:24px; height:24px; accent-color:var(--ac); flex:none; }
   .jam { font-variant-numeric:tabular-nums; font-weight:700; min-width:3.4em; }
   .nama { flex:1; }
   .kat { font-size:.8rem; color:var(--mute); display:block; }
   li.selesai .nama { text-decoration:line-through; color:var(--mute); }
+  li.nonaktif .baris { opacity:.55; }
+  .ikon { width:48px; flex:none; font-size:1.2rem; color:var(--fg); background:var(--card);
+          border:1px solid var(--bd); border-radius:12px; cursor:pointer; }
   #pesan { color:var(--mute); }
-  .galat { color:#c0392b; min-height:1.4em; margin:6px 0; }
+  .galat { color:var(--bahaya); min-height:1.4em; margin:6px 0; }
   .tombol { background:var(--ac); color:var(--bg); border:0; border-radius:10px;
             padding:10px 16px; font:inherit; font-weight:600; cursor:pointer; }
   .tombol.sekunder { background:transparent; color:var(--fg); border:1px solid var(--bd); }
+  .tombol.bahaya { background:var(--bahaya); color:#fff; }
+  .tombol.garis-bahaya { background:transparent; color:var(--bahaya); border:1px solid var(--bahaya); }
   .tombol:disabled { opacity:.6; }
   dialog { width:min(92vw, 460px); border:1px solid var(--bd); border-radius:14px;
            background:var(--card); color:var(--fg); padding:18px; }
@@ -47,21 +56,28 @@
   #boxHari input { width:20px; height:20px; }
   #fTanggal { margin:0 0 6px 34px; width:calc(100% - 34px); }
   .aksi { display:flex; justify-content:flex-end; gap:10px; margin-top:8px; }
+  .aksi .kiri { margin-right:auto; }
 </style>
 </head>
 <body>
   <header class="atas">
     <div>
-      <h1>Hari Ini</h1>
+      <h1 id="judul">Hari Ini</h1>
       <p id="tanggal"></p>
     </div>
     <button id="btnTambah" class="tombol">+ Tambah</button>
   </header>
+
+  <nav class="tab">
+    <button id="tabHari" class="aktif">Hari Ini</button>
+    <button id="tabSemua">Semua kegiatan</button>
+  </nav>
+
   <p id="pesan">Memuat…</p>
   <ul id="daftar"></ul>
 
   <dialog id="dlg">
-    <h2>Kegiatan Baru</h2>
+    <h2 id="judulForm">Kegiatan Baru</h2>
     <label class="f">Nama kegiatan
       <input id="fNama" type="text" maxlength="60" placeholder="mis. Olahraga sore">
     </label>
@@ -82,14 +98,25 @@
     </fieldset>
     <p id="galatForm" class="galat"></p>
     <div class="aksi">
+      <button id="btnHapus" class="tombol garis-bahaya kiri" hidden>Hapus</button>
       <button id="btnBatal" class="tombol sekunder">Batal</button>
       <button id="btnSimpan" class="tombol">Simpan</button>
     </div>
   </dialog>
 
+  <dialog id="dlgHapus">
+    <h2>Hapus kegiatan?</h2>
+    <p id="teksHapus"></p>
+    <p id="galatHapus" class="galat"></p>
+    <div class="aksi">
+      <button id="btnBatalHapus" class="tombol sekunder">Batal</button>
+      <button id="btnYaHapus" class="tombol bahaya">Ya, hapus</button>
+    </div>
+  </dialog>
+
 <script>
   // GANTI dengan URL aplikasi web dari Langkah 1 (berakhiran /exec)
-  const URL_API = 'https://script.google.com/macros/s/AKfycbwbGxpSb8TB5I7gSPbiLhhx4BrA7H4TSWwNSPHzmbQOAQpZuqQvwinzP9P5vl3EdltD/exec';
+  const URL_API = 'GANTI_DENGAN_URL_KAMU';
 
   const SINGKATAN = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];   // urutan getDay()
   const HARI_URUT = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'];   // urutan di formulir
@@ -107,6 +134,16 @@
 
   const pesanEl = document.getElementById('pesan');
   const daftarEl = document.getElementById('daftar');
+  const judulEl = document.getElementById('judul');
+  const tabHari = document.getElementById('tabHari');
+  const tabSemua = document.getElementById('tabSemua');
+
+  // state: kondisi aplikasi saat ini
+  let dataKegiatan = [];
+  let dataLog = [];
+  let tampilan = 'hari';   // 'hari' atau 'semua'
+  let idEdit = null;       // null = mode tambah, selain itu = mode ubah
+  let namaEdit = '';
 
   function tampilPesan(teks, galat) {
     pesanEl.textContent = teks;
@@ -134,33 +171,53 @@
     try {
       const [kegiatan, log] = await Promise.all([ambil('kegiatan'), ambil('log')]);
       if (!Array.isArray(kegiatan) || !Array.isArray(log)) throw new Error('data tidak valid');
-
+      dataKegiatan = kegiatan;
+      dataLog = log;
       isiSaranKategori(kegiatan);
-
-      const selesai = new Set(
-        log.filter(l => l.Tanggal === HARI_INI && l.Status === 'Selesai').map(l => l.ID)
-      );
-      const hariIni = kegiatan
-        .filter(k => k.Aktif === 'Ya' && cocokHariIni(k))
-        .sort((a, b) => rapikanJam(a.Mulai).localeCompare(rapikanJam(b.Mulai)));
-
-      daftarEl.textContent = '';
-      if (hariIni.length === 0) { tampilPesan('Tidak ada kegiatan hari ini.'); return; }
-      tampilPesan('');
-      hariIni.forEach(k => daftarEl.appendChild(buatBaris(k, selesai.has(k.ID))));
+      render();
     } catch (e) {
       tampilPesan('Gagal memuat data. Cek koneksi internet dan URL_API.', true);
     }
   }
 
+  function render() {
+    judulEl.textContent = tampilan === 'hari' ? 'Hari Ini' : 'Semua Kegiatan';
+    tabHari.classList.toggle('aktif', tampilan === 'hari');
+    tabSemua.classList.toggle('aktif', tampilan === 'semua');
+    daftarEl.textContent = '';
+
+    const selesai = new Set(
+      dataLog.filter(l => l.Tanggal === HARI_INI && l.Status === 'Selesai').map(l => l.ID)
+    );
+    const daftar = (tampilan === 'hari'
+      ? dataKegiatan.filter(k => k.Aktif === 'Ya' && cocokHariIni(k))
+      : dataKegiatan.slice()
+    ).sort((a, b) => rapikanJam(a.Mulai).localeCompare(rapikanJam(b.Mulai)));
+
+    if (daftar.length === 0) {
+      tampilPesan(tampilan === 'hari' ? 'Tidak ada kegiatan hari ini.' : 'Belum ada kegiatan.');
+      return;
+    }
+    tampilPesan('');
+    daftar.forEach(k => daftarEl.appendChild(buatBaris(k, selesai.has(k.ID))));
+  }
+
   function buatBaris(k, sudah) {
     const li = document.createElement('li');
-    if (sudah) li.className = 'selesai';
+    const modeHari = tampilan === 'hari';
+    if (modeHari && sudah) li.className = 'selesai';
+    if (!modeHari && k.Aktif !== 'Ya') li.className = 'nonaktif';
 
-    const label = document.createElement('label');
-    const cb = document.createElement('input');
-    cb.type = 'checkbox';
-    cb.checked = sudah;
+    const kotak = document.createElement(modeHari ? 'label' : 'div');
+    kotak.className = 'baris';
+
+    let cb = null;
+    if (modeHari) {
+      cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = sudah;
+      kotak.appendChild(cb);
+    }
 
     const jam = document.createElement('span');
     jam.className = 'jam';
@@ -171,17 +228,26 @@
     nama.textContent = k.Nama;
     const kat = document.createElement('span');
     kat.className = 'kat';
-    kat.textContent = k.Kategori;
+    kat.textContent = modeHari
+      ? k.Kategori
+      : k.Kategori + ' · ' + String(k.Hari).replace(/,/g, ', ') + (k.Aktif !== 'Ya' ? ' · nonaktif' : '');
     nama.appendChild(kat);
 
-    label.append(cb, jam, nama);
-    li.appendChild(label);
+    kotak.append(jam, nama);
+    li.appendChild(kotak);
 
-    cb.addEventListener('change', () => simpan(k.ID, cb, li));
+    const ubah = document.createElement('button');
+    ubah.className = 'ikon';
+    ubah.textContent = '✎';
+    ubah.setAttribute('aria-label', 'Ubah ' + k.Nama);
+    ubah.addEventListener('click', () => bukaForm(k));
+    li.appendChild(ubah);
+
+    if (cb) cb.addEventListener('change', () => simpanCentang(k.ID, cb, li));
     return li;
   }
 
-  async function simpan(id, cb, li) {
+  async function simpanCentang(id, cb, li) {
     const centang = cb.checked;
     li.classList.toggle('selesai', centang);
     cb.disabled = true;
@@ -190,6 +256,9 @@
                   encodeURIComponent(id) + '&status=' + (centang ? 'Selesai' : 'Batal');
       const hasil = await (await fetch(url)).json();
       if (!hasil.ok) throw new Error(hasil.error || 'gagal');
+      // perbarui salinan log di memori agar tab tetap benar
+      dataLog = dataLog.filter(l => !(l.Tanggal === HARI_INI && l.ID === id));
+      if (centang) dataLog.push({ Tanggal: HARI_INI, ID: id, Status: 'Selesai' });
       tampilPesan('');
     } catch (e) {
       cb.checked = !centang;
@@ -199,8 +268,12 @@
     cb.disabled = false;
   }
 
-  /* ---------- Formulir tambah kegiatan ---------- */
+  tabHari.addEventListener('click', () => { tampilan = 'hari'; render(); });
+  tabSemua.addEventListener('click', () => { tampilan = 'semua'; render(); });
+
+  /* ---------- Formulir tambah / ubah ---------- */
   const dlg = document.getElementById('dlg');
+  const judulForm = document.getElementById('judulForm');
   const fNama = document.getElementById('fNama');
   const fKat = document.getElementById('fKat');
   const fMulai = document.getElementById('fMulai');
@@ -208,6 +281,7 @@
   const boxHari = document.getElementById('boxHari');
   const galatForm = document.getElementById('galatForm');
   const btnSimpan = document.getElementById('btnSimpan');
+  const btnHapus = document.getElementById('btnHapus');
 
   HARI_URUT.forEach(h => {
     const l = document.createElement('label');
@@ -239,18 +313,38 @@
   }
   document.querySelectorAll('input[name=pola]').forEach(r => r.addEventListener('change', aturTampilanPola));
 
-  document.getElementById('btnTambah').addEventListener('click', () => {
-    fNama.value = '';
-    fKat.value = '';
-    fMulai.value = '';
+  // k = kegiatan yang diubah; kosong = mode tambah
+  function bukaForm(k) {
+    idEdit = k ? k.ID : null;
+    namaEdit = k ? k.Nama : '';
+    judulForm.textContent = k ? 'Ubah Kegiatan' : 'Kegiatan Baru';
+    btnHapus.hidden = !k;
+
+    fNama.value = k ? k.Nama : '';
+    fKat.value = k ? k.Kategori : '';
+    fMulai.value = k ? rapikanJam(k.Mulai) : '';
     fTanggal.value = '';
     boxHari.querySelectorAll('input').forEach(c => { c.checked = false; });
-    document.querySelector('input[name=pola][value=harian]').checked = true;
+
+    let pola = 'harian';
+    if (k) {
+      const h = String(k.Hari || '').trim();
+      if (/^\d{4}-\d{2}-\d{2}$/.test(h)) {
+        pola = 'sekali';
+        fTanggal.value = h;
+      } else if (h.toLowerCase() !== 'setiap hari') {
+        pola = 'mingguan';
+        const arr = h.split(',').map(x => x.trim());
+        boxHari.querySelectorAll('input').forEach(c => { c.checked = arr.indexOf(c.value) !== -1; });
+      }
+    }
+    document.querySelector('input[name=pola][value=' + pola + ']').checked = true;
     aturTampilanPola();
     galatForm.textContent = '';
     dlg.showModal();
-  });
+  }
 
+  document.getElementById('btnTambah').addEventListener('click', () => bukaForm(null));
   document.getElementById('btnBatal').addEventListener('click', () => dlg.close());
 
   btnSimpan.addEventListener('click', async () => {
@@ -278,21 +372,56 @@
     btnSimpan.disabled = true;
     btnSimpan.textContent = 'Menyimpan…';
     try {
-      const url = URL_API + '?aksi=tambah' +
+      const url = URL_API + (idEdit ? '?aksi=ubah&id=' + encodeURIComponent(idEdit) : '?aksi=tambah') +
         '&nama=' + encodeURIComponent(nama) +
         '&kategori=' + encodeURIComponent(kategori) +
         '&hari=' + encodeURIComponent(hari) +
         '&mulai=' + encodeURIComponent(mulai);
       const hasil = await (await fetch(url)).json();
       if (!hasil.ok) throw new Error(hasil.error || 'gagal');
+      const kataKerja = idEdit ? 'diperbarui' : 'ditambahkan';
       dlg.close();
       await muat();
-      tampilPesan('Kegiatan "' + nama + '" ditambahkan.');
+      tampilPesan('Kegiatan "' + nama + '" ' + kataKerja + '.');
     } catch (e) {
       galatForm.textContent = 'Gagal menyimpan: ' + e.message;
     }
     btnSimpan.disabled = false;
     btnSimpan.textContent = 'Simpan';
+  });
+
+  /* ---------- Hapus dengan konfirmasi ---------- */
+  const dlgHapus = document.getElementById('dlgHapus');
+  const galatHapus = document.getElementById('galatHapus');
+  const btnYaHapus = document.getElementById('btnYaHapus');
+
+  btnHapus.addEventListener('click', () => {
+    dlg.close();
+    document.getElementById('teksHapus').textContent =
+      'Kegiatan "' + namaEdit + '" akan dihapus dari daftar. Riwayat centang lama tetap tersimpan di Log.';
+    galatHapus.textContent = '';
+    dlgHapus.showModal();
+  });
+
+  document.getElementById('btnBatalHapus').addEventListener('click', () => {
+    dlgHapus.close();
+    dlg.showModal(); // kembali ke formulir ubah
+  });
+
+  btnYaHapus.addEventListener('click', async () => {
+    btnYaHapus.disabled = true;
+    btnYaHapus.textContent = 'Menghapus…';
+    try {
+      const hasil = await (await fetch(URL_API + '?aksi=hapus&id=' + encodeURIComponent(idEdit))).json();
+      if (!hasil.ok) throw new Error(hasil.error || 'gagal');
+      dlgHapus.close();
+      await muat();
+      tampilPesan('Kegiatan "' + namaEdit + '" dihapus.');
+    } catch (e) {
+      galatHapus.textContent = 'Gagal menghapus: ' + e.message;
+    }
+    btnYaHapus.disabled = false;
+    btnYaHapus.textContent = 'Ya, hapus';
   });
 
   muat();
