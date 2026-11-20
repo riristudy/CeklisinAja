@@ -18,19 +18,26 @@
   h1 { margin:0; font-size:1.6rem; color:var(--ac); }
   #tanggal { margin:2px 0 14px; color:var(--mute); }
   .tab { display:flex; gap:8px; margin:0 0 14px; }
-  .tab button { flex:1; padding:9px; font:inherit; color:var(--fg); background:transparent;
+  .tab button { flex:1; padding:9px 4px; font:inherit; font-size:.95rem; color:var(--fg); background:transparent;
                 border:1px solid var(--bd); border-radius:10px; cursor:pointer; }
   .tab button.aktif { background:var(--ac); color:var(--bg); border-color:var(--ac); font-weight:600; }
   ul { list-style:none; margin:0; padding:0; }
   li { margin:8px 0; display:flex; gap:8px; align-items:stretch; }
+  li.judul-tgl { display:block; margin:18px 0 4px; font-weight:600; color:var(--mute); }
   .baris { flex:1; display:flex; align-items:center; gap:14px; padding:14px;
            background:var(--card); border:1px solid var(--bd); border-radius:12px; }
   input[type=checkbox], input[type=radio] { width:24px; height:24px; accent-color:var(--ac); flex:none; }
   .jam { font-variant-numeric:tabular-nums; font-weight:700; min-width:3.4em; }
   .nama { flex:1; }
   .kat { font-size:.8rem; color:var(--mute); display:block; }
+  .tl { display:none; font-size:.8rem; color:var(--bahaya); font-weight:600; }
+  li.terlewat:not(.selesai) .tl { display:block; }
   li.selesai .nama { text-decoration:line-through; color:var(--mute); }
   li.nonaktif .baris { opacity:.55; }
+  .stat { width:1.4em; text-align:center; font-weight:700; flex:none; }
+  .stat.ok { color:var(--ac); }
+  .stat.tl2 { color:var(--bahaya); }
+  .label-stat { font-size:.8rem; color:var(--mute); }
   .ikon { width:48px; flex:none; font-size:1.2rem; color:var(--fg); background:var(--card);
           border:1px solid var(--bd); border-radius:12px; cursor:pointer; }
   #pesan { color:var(--mute); }
@@ -70,7 +77,8 @@
 
   <nav class="tab">
     <button id="tabHari" class="aktif">Hari Ini</button>
-    <button id="tabSemua">Semua kegiatan</button>
+    <button id="tabSemua">Semua</button>
+    <button id="tabRiwayat">Riwayat</button>
   </nav>
 
   <p id="pesan">Memuat…</p>
@@ -137,11 +145,12 @@
   const judulEl = document.getElementById('judul');
   const tabHari = document.getElementById('tabHari');
   const tabSemua = document.getElementById('tabSemua');
+  const tabRiwayat = document.getElementById('tabRiwayat');
 
   // state: kondisi aplikasi saat ini
   let dataKegiatan = [];
   let dataLog = [];
-  let tampilan = 'hari';   // 'hari' atau 'semua'
+  let tampilan = 'hari';   // 'hari', 'semua', atau 'riwayat'
   let idEdit = null;       // null = mode tambah, selain itu = mode ubah
   let namaEdit = '';
 
@@ -181,10 +190,13 @@
   }
 
   function render() {
-    judulEl.textContent = tampilan === 'hari' ? 'Hari Ini' : 'Semua Kegiatan';
+    judulEl.textContent = { hari: 'Hari Ini', semua: 'Semua Kegiatan', riwayat: 'Riwayat' }[tampilan];
     tabHari.classList.toggle('aktif', tampilan === 'hari');
     tabSemua.classList.toggle('aktif', tampilan === 'semua');
+    tabRiwayat.classList.toggle('aktif', tampilan === 'riwayat');
     daftarEl.textContent = '';
+
+    if (tampilan === 'riwayat') { renderRiwayat(); return; }
 
     const selesai = new Set(
       dataLog.filter(l => l.Tanggal === HARI_INI && l.Status === 'Selesai').map(l => l.ID)
@@ -205,8 +217,13 @@
   function buatBaris(k, sudah) {
     const li = document.createElement('li');
     const modeHari = tampilan === 'hari';
-    if (modeHari && sudah) li.className = 'selesai';
-    if (!modeHari && k.Aktif !== 'Ya') li.className = 'nonaktif';
+    const terlewat = modeHari && !sudah &&
+      dataLog.some(l => l.Tanggal === HARI_INI && l.ID === k.ID && l.Status === 'Terlewat');
+    const kelas = [];
+    if (modeHari && sudah) kelas.push('selesai');
+    if (terlewat) kelas.push('terlewat');
+    if (!modeHari && k.Aktif !== 'Ya') kelas.push('nonaktif');
+    li.className = kelas.join(' ');
 
     const kotak = document.createElement(modeHari ? 'label' : 'div');
     kotak.className = 'baris';
@@ -232,6 +249,12 @@
       ? k.Kategori
       : k.Kategori + ' · ' + String(k.Hari).replace(/,/g, ', ') + (k.Aktif !== 'Ya' ? ' · nonaktif' : '');
     nama.appendChild(kat);
+    if (modeHari) {
+      const tl = document.createElement('span');
+      tl.className = 'tl';
+      tl.textContent = 'Terlewat';
+      nama.appendChild(tl);
+    }
 
     kotak.append(jam, nama);
     li.appendChild(kotak);
@@ -256,7 +279,7 @@
                   encodeURIComponent(id) + '&status=' + (centang ? 'Selesai' : 'Batal');
       const hasil = await (await fetch(url)).json();
       if (!hasil.ok) throw new Error(hasil.error || 'gagal');
-      // perbarui salinan log di memori agar tab tetap benar
+      // perbarui salinan log di memori (catatan lama Selesai/Terlewat diganti)
       dataLog = dataLog.filter(l => !(l.Tanggal === HARI_INI && l.ID === id));
       if (centang) dataLog.push({ Tanggal: HARI_INI, ID: id, Status: 'Selesai' });
       tampilPesan('');
@@ -268,8 +291,71 @@
     cb.disabled = false;
   }
 
+  /* ---------- Riwayat ---------- */
+  function formatTanggal(t) {
+    const p = t.split('-').map(Number);
+    const d = new Date(p[0], p[1] - 1, p[2]);
+    return NAMA_HARI[d.getDay()] + ', ' + p[2] + ' ' + NAMA_BULAN[p[1] - 1] + ' ' + p[0] +
+           (t === HARI_INI ? ' (hari ini)' : '');
+  }
+
+  function jamDari(id) {
+    const k = dataKegiatan.find(x => x.ID === id);
+    return k ? rapikanJam(k.Mulai) : '';
+  }
+
+  function renderRiwayat() {
+    const perTanggal = {};
+    dataLog.forEach(l => {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(l.Tanggal)) return;
+      (perTanggal[l.Tanggal] = perTanggal[l.Tanggal] || []).push(l);
+    });
+    const urut = Object.keys(perTanggal).sort().reverse().slice(0, 14);
+    if (urut.length === 0) { tampilPesan('Belum ada riwayat.'); return; }
+    tampilPesan('Menampilkan sampai 14 hari terakhir.');
+
+    urut.forEach(t => {
+      const judul = document.createElement('li');
+      judul.className = 'judul-tgl';
+      judul.textContent = formatTanggal(t);
+      daftarEl.appendChild(judul);
+
+      perTanggal[t]
+        .sort((a, b) => (jamDari(a.ID) || '99:99').localeCompare(jamDari(b.ID) || '99:99'))
+        .forEach(l => daftarEl.appendChild(barisRiwayat(l)));
+    });
+  }
+
+  function barisRiwayat(l) {
+    const li = document.createElement('li');
+    const kotak = document.createElement('div');
+    kotak.className = 'baris';
+    const ok = l.Status === 'Selesai';
+
+    const stat = document.createElement('span');
+    stat.className = 'stat ' + (ok ? 'ok' : 'tl2');
+    stat.textContent = ok ? '✓' : '✕';
+
+    const jam = document.createElement('span');
+    jam.className = 'jam';
+    jam.textContent = jamDari(l.ID) || '--:--';
+
+    const nama = document.createElement('span');
+    nama.className = 'nama';
+    nama.textContent = l.Nama || l.ID;
+
+    const label = document.createElement('span');
+    label.className = 'label-stat';
+    label.textContent = ok ? 'Selesai' : 'Terlewat';
+
+    kotak.append(stat, jam, nama, label);
+    li.appendChild(kotak);
+    return li;
+  }
+
   tabHari.addEventListener('click', () => { tampilan = 'hari'; render(); });
   tabSemua.addEventListener('click', () => { tampilan = 'semua'; render(); });
+  tabRiwayat.addEventListener('click', () => { tampilan = 'riwayat'; render(); });
 
   /* ---------- Formulir tambah / ubah ---------- */
   const dlg = document.getElementById('dlg');
@@ -313,7 +399,6 @@
   }
   document.querySelectorAll('input[name=pola]').forEach(r => r.addEventListener('change', aturTampilanPola));
 
-  // k = kegiatan yang diubah; kosong = mode tambah
   function bukaForm(k) {
     idEdit = k ? k.ID : null;
     namaEdit = k ? k.Nama : '';
@@ -382,7 +467,7 @@
       const kataKerja = idEdit ? 'diperbarui' : 'ditambahkan';
       dlg.close();
       await muat();
-            tampilPesan(hasil.peringatan ? hasil.peringatan : 'Kegiatan "' + nama + '" ' + kataKerja + '.', !!hasil.peringatan);
+      tampilPesan(hasil.peringatan ? hasil.peringatan : 'Kegiatan "' + nama + '" ' + kataKerja + '.', !!hasil.peringatan);
     } catch (e) {
       galatForm.textContent = 'Gagal menyimpan: ' + e.message;
     }
@@ -398,14 +483,14 @@
   btnHapus.addEventListener('click', () => {
     dlg.close();
     document.getElementById('teksHapus').textContent =
-      'Kegiatan "' + namaEdit + '" akan dihapus dari daftar. Riwayat centang lama tetap tersimpan di Log.';
+      'Kegiatan "' + namaEdit + '" akan dihapus dari daftar dan dari Calendar. Riwayat lama tetap tersimpan di Log.';
     galatHapus.textContent = '';
     dlgHapus.showModal();
   });
 
   document.getElementById('btnBatalHapus').addEventListener('click', () => {
     dlgHapus.close();
-    dlg.showModal(); // kembali ke formulir ubah
+    dlg.showModal();
   });
 
   btnYaHapus.addEventListener('click', async () => {
@@ -416,7 +501,7 @@
       if (!hasil.ok) throw new Error(hasil.error || 'gagal');
       dlgHapus.close();
       await muat();
-      tampilPesan('Kegiatan "' + namaEdit + '" dihapus.');
+      tampilPesan(hasil.peringatan ? hasil.peringatan : 'Kegiatan "' + namaEdit + '" dihapus.', !!hasil.peringatan);
     } catch (e) {
       galatHapus.textContent = 'Gagal menghapus: ' + e.message;
     }
